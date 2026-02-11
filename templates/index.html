@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Planner - AI Assistant</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <h1>📋 Task Planner</h1>
+                <span class="badge">AI Assistant Dashboard</span>
+            </div>
+            <div class="header-right">
+                <div class="stats-summary">
+                    <span class="stat-item">📊 Всего: <strong id="stat-total">0</strong></span>
+                    <span class="stat-item">✅ Выполнено: <strong id="stat-done">0</strong></span>
+                    <span class="stat-item">🔄 В работе: <strong id="stat-progress">0</strong></span>
+                </div>
+                <button class="btn btn-primary" onclick="openModal('add-task')">+ Новая задача</button>
+            </div>
+        </header>
+
+        <!-- Kanban Board -->
+        <div class="board">
+            <!-- TODO Column -->
+            <div class="column" data-status="todo">
+                <div class="column-header">
+                    <span class="column-title">📝 TODO</span>
+                    <span class="task-count" id="count-todo">0</span>
+                </div>
+                <div class="task-list" id="todo-list">
+                    <!-- Tasks will be rendered here -->
+                </div>
+            </div>
+
+            <!-- IN PROGRESS Column -->
+            <div class="column" data-status="in_progress">
+                <div class="column-header">
+                    <span class="column-title">🔄 В РАБОТЕ</span>
+                    <span class="task-count" id="count-in_progress">0</span>
+                </div>
+                <div class="task-list" id="in_progress-list">
+                    <!-- Tasks will be rendered here -->
+                </div>
+            </div>
+
+            <!-- REVIEW Column -->
+            <div class="column" data-status="review">
+                <div class="column-header">
+                    <span class="column-title">👀 НА ПРОВЕРКЕ</span>
+                    <span class="task-count" id="count-review">0</span>
+                </div>
+                <div class="task-list" id="review-list">
+                    <!-- Tasks will be rendered here -->
+                </div>
+            </div>
+
+            <!-- DONE Column -->
+            <div class="column" data-status="done">
+                <div class="column-header">
+                    <span class="column-title">✅ ГОТОВО</span>
+                    <span class="task-count" id="count-done">0</span>
+                </div>
+                <div class="task-list" id="done-list">
+                    <!-- Tasks will be rendered here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Modal -->
+    <div class="modal" id="task-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title">Новая задача</h2>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <form id="task-form" onsubmit="handleTaskSubmit(event)">
+                <input type="hidden" id="task-id">
+                <div class="form-group">
+                    <label>Название</label>
+                    <input type="text" id="task-title" required placeholder="Что нужно сделать?">
+                </div>
+                <div class="form-group">
+                    <label>Описание</label>
+                    <textarea id="task-description" rows="3" placeholder="Подробности задачи..."></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Статус</label>
+                        <select id="task-status">
+                            <option value="todo">📝 TODO</option>
+                            <option value="in_progress">🔄 В работе</option>
+                            <option value="review">👀 На проверке</option>
+                            <option value="done">✅ Готово</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Приоритет</label>
+                        <select id="task-priority">
+                            <option value="0">⭐ Обычный</option>
+                            <option value="1">🔥 Высокий</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Comments Modal -->
+    <div class="modal" id="comments-modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2 id="comments-title">Комментарии</h2>
+                <button class="close-btn" onclick="closeCommentsModal()">&times;</button>
+            </div>
+            <div class="comments-list" id="comments-list">
+                <!-- Comments will be rendered here -->
+            </div>
+            <div class="comment-form">
+                <textarea id="new-comment" rows="2" placeholder="Написать комментарий..."></textarea>
+                <button class="btn btn-primary" onclick="addComment()">Отправить</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
