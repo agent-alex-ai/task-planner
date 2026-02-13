@@ -44,7 +44,18 @@ def create_app(testing: bool = False):
     # Templates
     @app.route('/')
     def index():
-        return render_template('index.html')
+        """Main page - requires authentication"""
+        from flask_jwt_extended import verify_jwt_in_request
+        try:
+            verify_jwt_in_request()
+            return render_template('index.html')
+        except Exception:
+            return render_template('index.html', requires_auth=True)
+    
+    @app.route('/login')
+    def login_page():
+        """Login page - no auth required"""
+        return render_template('index.html', login_page=True)
     
     # Create tables (only if not testing)
     if not testing:
@@ -61,3 +72,7 @@ def create_app(testing: bool = False):
 if __name__ == '__main__':
     app = create_app()
     app.run(debug=True, host='0.0.0.0', port=5000)
+
+
+# Export app for gunicorn
+app = create_app()

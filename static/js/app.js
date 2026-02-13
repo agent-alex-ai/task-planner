@@ -31,11 +31,32 @@ function setupEventListeners() {
 
 // Auth Functions
 function checkAuth() {
+    const requiresAuth = document.body.dataset.requiresAuth === 'true';
+    const isLoginPage = document.body.dataset.loginPage === 'true';
+    
     if (accessToken) {
+        // Already have token - add authenticated class immediately
+        document.body.classList.add('authenticated');
         fetchUser();
+    } else if (requiresAuth || isLoginPage) {
+        // Server says we need auth - show login modal only
+        showLoginModal();
     } else {
+        // Client-side check - show login modal
         showLoginModal();
     }
+}
+
+// Show main app after successful auth
+function showMainApp() {
+    document.getElementById('main-app').style.display = 'block';
+    document.body.classList.add('authenticated');
+}
+
+// Hide main app
+function hideMainApp() {
+    document.getElementById('main-app').style.display = 'none';
+    document.body.classList.remove('authenticated');
 }
 
 async function fetchUser() {
@@ -46,6 +67,7 @@ async function fetchUser() {
         if (response.ok) {
             currentUser = await response.json();
             document.getElementById('current-user').textContent = currentUser.username;
+            showMainApp();  // Show the main app
             loadTasks();
             loadUsers();
             loadActivities();
@@ -77,6 +99,7 @@ async function handleLogin(event) {
             localStorage.setItem('access_token', accessToken);
             document.getElementById('current-user').textContent = currentUser.username;
             closeModal('login-modal');
+            showMainApp();  // Show main app after login
             loadTasks();
             loadUsers();
             loadActivities();
@@ -104,8 +127,23 @@ async function handleRegister(event) {
         
         const data = await response.json();
         if (response.ok) {
-            showToast('Регистрация успешна! Теперь войдите.', 'success');
-            closeRegisterModal();
+            // Auto login after registration
+            const loginResponse = await fetch(`${API_BASE}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            
+            if (loginResponse.ok) {
+                const loginData = await loginResponse.json();
+                accessToken = loginData.access_token;
+                localStorage.setItem('access_token', accessToken);
+                showToast('Добро пожаловать!', 'success');
+                await fetchUser();
+            } else {
+                showToast('Регистрация успешна! Войдите.', 'success');
+                closeRegisterModal();
+            }
         } else {
             showToast(data.error || 'Ошибка регистрации', 'error');
         }
@@ -114,17 +152,36 @@ async function handleRegister(event) {
     }
 }
 
+function toggleUserMenu() {
+    const dropdown = document.getElementById('user-dropdown');
+    dropdown.classList.toggle('show');
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', (e) => {
+    const userMenu = document.querySelector('.user-menu');
+    const dropdown = document.getElementById('user-dropdown');
+    if (userMenu && !userMenu.contains(e.target)) {
+        dropdown.classList.remove('show');
+    }
+});
+
 function logout() {
     accessToken = null;
     currentUser = null;
     localStorage.removeItem('access_token');
-    showLoginModal();
+    hideMainApp();  // Hide main app
+    document.body.classList.remove('authenticated');
+    // Show login modal (not register)
+    document.getElementById('login-modal').classList.add('active');
+    document.getElementById('register-modal').classList.remove('active');
     tasks = [];
     renderTasks();
     updateStats();
 }
 
 function showLoginModal() {
+    document.getElementById('register-modal').classList.remove('active');
     document.getElementById('login-modal').classList.add('active');
 }
 
@@ -133,8 +190,14 @@ function showRegisterModal() {
     document.getElementById('register-modal').classList.add('active');
 }
 
+// Alias for compatibility with HTML onclick
+function showRegister() {
+    showRegisterModal();
+}
+
 function closeRegisterModal() {
     document.getElementById('register-modal').classList.remove('active');
+    document.getElementById('login-modal').classList.add('active');
 }
 
 // API Functions
@@ -649,6 +712,15 @@ function escapeHtml(text) {
 // Close modals on backdrop click
 document.addEventListener('click', (e) => {
     if (e.target.classList.contains('modal')) {
+        // Don't close login/register modal if not authenticated
+        const loginModal = document.getElementById('login-modal');
+        const registerModal = document.getElementById('register-modal');
+        if (loginModal && loginModal.classList.contains('active') && !currentUser) {
+            return;  // Can't close login modal without being logged in
+        }
+        if (registerModal && registerModal.classList.contains('active') && !currentUser) {
+            return;  // Can't close register modal without being logged in
+        }
         e.target.classList.remove('active');
     }
 });
@@ -656,6 +728,13 @@ document.addEventListener('click', (e) => {
 // Close modals on Escape
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+        // Don't close login/register modal if not authenticated
+        const loginModal = document.getElementById('login-modal');
+        const registerModal = document.getElementById('register-modal');
+        if ((loginModal && loginModal.classList.contains('active') && !currentUser) ||
+            (registerModal && registerModal.classList.contains('active') && !currentUser)) {
+            return;  // Can't close login/register modal without being logged in
+        }
         document.querySelectorAll('.modal').forEach(modal => {
             modal.classList.remove('active');
         });

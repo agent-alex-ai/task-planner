@@ -737,3 +737,71 @@ body {
     background: rgba(102, 126, 234, 0.1);
     border-radius: var(--radius);
 }
+
+/* Hide app content when login/register modal is shown */
+body:not(.authenticated) .app {
+    display: none !important;
+}
+
+/* Show only login modal when not authenticated (register is hidden by default) */
+body:not(.authenticated) #login-modal {
+    display: flex !important;
+}
+
+body.authenticated #login-modal,
+body.authenticated #register-modal {
+    display: none !important;
+}
+
+/* User dropdown menu */
+.user-menu {
+    position: relative;
+    display: inline-block;
+}
+
+.btn-user {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    padding: 8px 16px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.btn-user:hover {
+    background: var(--bg-hover);
+}
+
+.user-dropdown {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    margin-top: 4px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 1000;
+    min-width: 150px;
+}
+
+.user-dropdown.show {
+    display: block;
+}
+
+.btn-logout {
+    display: block;
+    width: 100%;
+    padding: 10px 16px;
+    text-align: left;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-color);
+    font-size: 14px;
+}
+
+.btn-logout:hover {
+    background: var(--bg-hover);
+}

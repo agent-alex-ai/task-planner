@@ -7,8 +7,9 @@
     <link rel="stylesheet" href="/static/css/styles.css">
     <link rel="stylesheet" href="/static/css/dark-theme.css" id="dark-theme" disabled>
 </head>
-<body>
-    <div class="app">
+<body data-requires-auth="{{ 'true' if requires_auth else 'false' }}" data-login-page="{{ 'true' if login_page else 'false' }}">
+    <!-- Main App - hidden if not authenticated -->
+    <div class="app" id="main-app" style="display: none;">
         <!-- Header -->
         <header class="header">
             <div class="header-left">
@@ -44,7 +45,10 @@
                 <button class="btn btn-icon" onclick="exportCSV()" title="📥 Экспорт CSV">📥</button>
                 <button class="btn btn-primary" onclick="openModal('add-task')">+ Новая задача</button>
                 <div class="user-menu">
-                    <span id="current-user">👤</span>
+                    <button class="btn btn-user" id="current-user" onclick="toggleUserMenu()">👤</button>
+                    <div class="user-dropdown" id="user-dropdown">
+                        <button class="btn btn-logout" onclick="logout()">🚪 Выйти</button>
+                    </div>
                 </div>
             </div>
         </header>
@@ -107,6 +111,7 @@
             </div>
         </aside>
     </div>
+</div>
 
     <!-- Task Modal -->
     <div class="modal" id="task-modal">
