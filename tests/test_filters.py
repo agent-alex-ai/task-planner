@@ -2,7 +2,7 @@
 Test user and filter endpoints
 """
 import pytest
-from app import db, User
+from models import db, User
 
 
 class TestUsers:

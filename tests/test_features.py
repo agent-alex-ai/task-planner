@@ -2,7 +2,7 @@
 Test activity and statistics endpoints
 """
 import pytest
-from app import db, Activity
+from models import db, Activity
 
 
 class TestActivities:
@@ -98,9 +98,9 @@ class TestHealth:
     
     def test_health_check(self, client):
         """Test health check endpoint"""
-        response = client.get('/health')
+        response = client.get('/api/health')
         
         assert response.status_code == 200
         data = response.get_json()
-        assert data['status'] == 'healthy'
-        assert 'timestamp' in data
+        assert data['status'] == 'ok'
+        assert 'database' in data

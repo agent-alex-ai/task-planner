@@ -2,7 +2,7 @@
 Test task endpoints
 """
 import pytest
-from app import db, Task
+from models import db, Task
 
 
 class TestTasks:

@@ -2,7 +2,7 @@
 Test authentication endpoints
 """
 import pytest
-from app import db, User
+from models import db, User
 from werkzeug.security import generate_password_hash
 
 

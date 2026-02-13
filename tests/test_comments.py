@@ -2,7 +2,7 @@
 Test comment endpoints
 """
 import pytest
-from app import db, Comment
+from models import db, Comment
 
 
 class TestComments:

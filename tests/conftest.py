@@ -1,19 +1,19 @@
 """
-Test configuration for Task Planner
+Test configuration for Task Planner - Refactored
 """
-import pytest
 import os
-# Set SQLite BEFORE importing app
 os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
 
-from app import app, db, User, Task, Comment, Activity
+import pytest
+from app import create_app
+from models import db, User, Task, Comment, Activity
 from werkzeug.security import generate_password_hash
 
 
 @pytest.fixture(scope='function')
 def client():
     """Create test client with SQLite - fresh database for each test"""
-    app.config['TESTING'] = True
+    app = create_app(testing=True)
     app.config['JWT_SECRET_KEY'] = 'test-secret-key'
     
     with app.test_client() as client:
@@ -30,7 +30,7 @@ def client():
 @pytest.fixture(scope='function')
 def test_user(client):
     """Create test user and return dict for safe access outside app context"""
-    with app.app_context():
+    with client.application.app_context():
         user = User(
             username='testuser',
             email='test@example.com',
@@ -38,7 +38,6 @@ def test_user(client):
         )
         db.session.add(user)
         db.session.commit()
-        # Return dict with id to avoid DetachedInstanceError
         return {'id': user.id, 'username': user.username, 'email': user.email}
 
 
