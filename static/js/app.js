@@ -1,20 +1,159 @@
-// Task Planner - Frontend JavaScript
+// Task Planner - Frontend JavaScript with Authentication, Search, Filters, Dark Mode
+
 const API_BASE = '/api';
 
 // State
 let tasks = [];
+let users = [];
 let currentTaskId = null;
+let currentUser = null;
+let accessToken = localStorage.getItem('access_token');
+let isDarkMode = false;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    loadTasks();
-    setupDragAndDrop();
+    checkAuth();
+    setupEventListeners();
+    applyTheme();
 });
+
+// Event Listeners
+function setupEventListeners() {
+    // Search with debounce
+    let searchTimeout;
+    document.getElementById('search-input').addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            applyFilters();
+        }, 300);
+    });
+}
+
+// Auth Functions
+function checkAuth() {
+    if (accessToken) {
+        fetchUser();
+    } else {
+        showLoginModal();
+    }
+}
+
+async function fetchUser() {
+    try {
+        const response = await fetch(`${API_BASE}/auth/me`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+        if (response.ok) {
+            currentUser = await response.json();
+            document.getElementById('current-user').textContent = currentUser.username;
+            loadTasks();
+            loadUsers();
+            loadActivities();
+        } else {
+            logout();
+        }
+    } catch (error) {
+        console.error('Error fetching user:', error);
+        logout();
+    }
+}
+
+async function handleLogin(event) {
+    event.preventDefault();
+    const username = document.getElementById('login-username').value;
+    const password = document.getElementById('login-password').value;
+    
+    try {
+        const response = await fetch(`${API_BASE}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        
+        const data = await response.json();
+        if (response.ok) {
+            accessToken = data.access_token;
+            currentUser = data.user;
+            localStorage.setItem('access_token', accessToken);
+            document.getElementById('current-user').textContent = currentUser.username;
+            closeModal('login-modal');
+            loadTasks();
+            loadUsers();
+            loadActivities();
+            showToast('Добро пожаловать, ' + currentUser.username + '!', 'success');
+        } else {
+            showToast(data.error || 'Ошибка входа', 'error');
+        }
+    } catch (error) {
+        showToast('Ошибка соединения', 'error');
+    }
+}
+
+async function handleRegister(event) {
+    event.preventDefault();
+    const username = document.getElementById('reg-username').value;
+    const email = document.getElementById('reg-email').value;
+    const password = document.getElementById('reg-password').value;
+    
+    try {
+        const response = await fetch(`${API_BASE}/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, email, password })
+        });
+        
+        const data = await response.json();
+        if (response.ok) {
+            showToast('Регистрация успешна! Теперь войдите.', 'success');
+            closeRegisterModal();
+        } else {
+            showToast(data.error || 'Ошибка регистрации', 'error');
+        }
+    } catch (error) {
+        showToast('Ошибка соединения', 'error');
+    }
+}
+
+function logout() {
+    accessToken = null;
+    currentUser = null;
+    localStorage.removeItem('access_token');
+    showLoginModal();
+    tasks = [];
+    renderTasks();
+    updateStats();
+}
+
+function showLoginModal() {
+    document.getElementById('login-modal').classList.add('active');
+}
+
+function showRegisterModal() {
+    document.getElementById('login-modal').classList.remove('active');
+    document.getElementById('register-modal').classList.add('active');
+}
+
+function closeRegisterModal() {
+    document.getElementById('register-modal').classList.remove('active');
+}
 
 // API Functions
 async function loadTasks() {
+    if (!accessToken) return;
+    
     try {
-        const response = await fetch(`${API_BASE}/tasks`);
+        const params = new URLSearchParams();
+        const status = document.getElementById('filter-status').value;
+        const priority = document.getElementById('filter-priority').value;
+        const search = document.getElementById('search-input').value;
+        
+        if (status) params.append('status', status);
+        if (priority) params.append('priority', priority);
+        if (search) params.append('q', search);
+        
+        const response = await fetch(`${API_BASE}/tasks?${params}`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
         tasks = await response.json();
         renderTasks();
         updateStats();
@@ -23,20 +162,47 @@ async function loadTasks() {
     }
 }
 
+async function loadUsers() {
+    try {
+        const response = await fetch(`${API_BASE}/users`);
+        users = await response.json();
+        populateAssigneeSelect();
+    } catch (error) {
+        console.error('Error loading users:', error);
+    }
+}
+
+async function loadActivities() {
+    try {
+        const response = await fetch(`${API_BASE}/activities?limit=20`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+        const activities = await response.json();
+        renderActivities(activities);
+    } catch (error) {
+        console.error('Error loading activities:', error);
+    }
+}
+
 async function createTask(taskData) {
     try {
         const response = await fetch(`${API_BASE}/tasks`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`
+            },
             body: JSON.stringify(taskData)
         });
         const result = await response.json();
-        if (result.status === 'created') {
+        if (response.ok) {
             loadTasks();
             return true;
+        } else {
+            showToast(result.error || 'Ошибка создания задачи', 'error');
         }
     } catch (error) {
-        console.error('Error creating task:', error);
+        showToast('Ошибка соединения', 'error');
     }
     return false;
 }
@@ -45,18 +211,44 @@ async function updateTask(taskId, taskData) {
     try {
         const response = await fetch(`${API_BASE}/tasks/${taskId}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`
+            },
             body: JSON.stringify(taskData)
         });
         const result = await response.json();
-        if (result.status === 'updated') {
+        if (response.ok) {
             loadTasks();
+            loadActivities();
             return true;
+        } else {
+            showToast(result.error || 'Ошибка обновления', 'error');
         }
     } catch (error) {
-        console.error('Error updating task:', error);
+        showToast('Ошибка соединения', 'error');
     }
     return false;
+}
+
+async function moveTask(taskId, newStatus, position = 0) {
+    try {
+        const response = await fetch(`${API_BASE}/tasks/${taskId}/move`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`
+            },
+            body: JSON.stringify({ status: newStatus, position })
+        });
+        const result = await response.json();
+        if (response.ok) {
+            loadTasks();
+            loadActivities();
+        }
+    } catch (error) {
+        showToast('Ошибка перемещения', 'error');
+    }
 }
 
 async function deleteTask(taskId) {
@@ -64,22 +256,30 @@ async function deleteTask(taskId) {
     
     try {
         const response = await fetch(`${API_BASE}/tasks/${taskId}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${accessToken}` }
         });
         const result = await response.json();
-        if (result.status === 'deleted') {
+        if (response.ok) {
             loadTasks();
+            loadActivities();
+            closeModal('task-modal');
+            showToast('Задача удалена', 'success');
             return true;
+        } else {
+            showToast(result.error || 'Ошибка удаления', 'error');
         }
     } catch (error) {
-        console.error('Error deleting task:', error);
+        showToast('Ошибка соединения', 'error');
     }
     return false;
 }
 
 async function getComments(taskId) {
     try {
-        const response = await fetch(`${API_BASE}/tasks/${taskId}/comments`);
+        const response = await fetch(`${API_BASE}/tasks/${taskId}/comments`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
         return await response.json();
     } catch (error) {
         console.error('Error loading comments:', error);
@@ -87,19 +287,25 @@ async function getComments(taskId) {
     }
 }
 
-async function addComment(taskId, content, author = 'Alex') {
+async function addComment(taskId, content) {
     try {
         const response = await fetch(`${API_BASE}/tasks/${taskId}/comments`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ author, content })
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`
+            },
+            body: JSON.stringify({ 
+                content,
+                author: currentUser?.username || 'Alex'
+            })
         });
         const result = await response.json();
-        if (result.status === 'comment_added') {
+        if (response.ok) {
             return true;
         }
     } catch (error) {
-        console.error('Error adding comment:', error);
+        showToast('Ошибка добавления комментария', 'error');
     }
     return false;
 }
@@ -135,20 +341,32 @@ function renderTasks() {
 
 function createTaskCard(task) {
     const card = document.createElement('div');
-    card.className = `task-card ${task.priority == 1 ? 'priority-high' : ''}`;
+    card.className = `task-card priority-${task.priority || 1}`;
     card.dataset.status = task.status;
     card.dataset.id = task.id;
-    card.onclick = () => openTaskDetails(task.id);
+    card.draggable = true;
+    card.ondragstart = drag;
     
-    const date = new Date(task.created_at).toLocaleDateString('ru-RU');
+    const priorityLabels = ['📉', '⭐', '🔥'];
+    const date = task.due_date ? new Date(task.due_date).toLocaleDateString('ru-RU') : '';
+    const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'done';
     
     card.innerHTML = `
+        <div class="priority-badge">${priorityLabels[task.priority || 1]}</div>
+        <div class="task-drag-handle">⋮⋮</div>
         <div class="task-title">${escapeHtml(task.title)}</div>
         <div class="task-meta">
-            <span class="task-assignee">${task.assignee || '🤖 AI'}</span>
-            <span class="task-date">${date}</span>
+            <div class="task-meta-left">
+                <span class="task-assignee">${task.assignee?.username || '🤖 AI'}</span>
+                ${date ? `<span class="task-due-date ${isOverdue ? 'overdue' : ''}">📅 ${date}</span>` : ''}
+            </div>
+            <div class="task-meta-right">
+                <span class="task-comments-badge">💬 ${task.comments_count || 0}</span>
+            </div>
         </div>
     `;
+    
+    card.onclick = () => openTaskDetails(task.id);
     
     return card;
 }
@@ -157,12 +375,59 @@ function updateStats() {
     const stats = {
         total: tasks.length,
         done: tasks.filter(t => t.status === 'done').length,
-        progress: tasks.filter(t => t.status === 'in_progress').length
+        progress: tasks.filter(t => t.status === 'in_progress').length,
+        overdue: tasks.filter(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'done').length
     };
     
     document.getElementById('stat-total').textContent = stats.total;
     document.getElementById('stat-done').textContent = stats.done;
     document.getElementById('stat-progress').textContent = stats.progress;
+    document.getElementById('stat-overdue').textContent = stats.overdue;
+}
+
+function renderActivities(activities) {
+    const container = document.getElementById('activity-list');
+    
+    if (activities.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-secondary); text-align: center;">Нет активности</p>';
+        return;
+    }
+    
+    const actionLabels = {
+        'created': 'создал(а)',
+        'updated': 'обновил(а)',
+        'deleted': 'удалить(а)',
+        'status_changed': 'изменил(а) статус',
+        'commented': 'прокомментировал(а)'
+    };
+    
+    container.innerHTML = activities.map(activity => {
+        const time = new Date(activity.created_at).toLocaleString('ru-RU');
+        return `
+            <div class="activity-item">
+                <div class="activity-content">
+                    <strong>${escapeHtml(activity.user?.username || 'Unknown')}</strong> 
+                    ${actionLabels[activity.action] || activity.action}
+                    ${activity.entity_type === 'task' ? 'задачу' : activity.entity_type}
+                </div>
+                <div class="activity-time">${time}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+function populateAssigneeSelect() {
+    const select = document.getElementById('task-assignee');
+    select.innerHTML = '<option value="">🤖 AI</option>';
+    
+    users.forEach(user => {
+        if (user.id !== currentUser?.id) {
+            const option = document.createElement('option');
+            option.value = user.id;
+            option.textContent = user.username;
+            select.appendChild(option);
+        }
+    });
 }
 
 // Modal Functions
@@ -170,11 +435,13 @@ function openModal(mode, taskId = null) {
     const modal = document.getElementById('task-modal');
     const form = document.getElementById('task-form');
     const title = document.getElementById('modal-title');
+    const deleteBtn = document.getElementById('delete-task-btn');
     
     if (mode === 'add') {
         title.textContent = 'Новая задача';
         form.reset();
         document.getElementById('task-id').value = '';
+        deleteBtn.style.display = 'none';
     } else if (mode === 'edit' && taskId) {
         title.textContent = 'Редактировать задачу';
         const task = tasks.find(t => t.id === taskId);
@@ -183,15 +450,19 @@ function openModal(mode, taskId = null) {
             document.getElementById('task-title').value = task.title;
             document.getElementById('task-description').value = task.description || '';
             document.getElementById('task-status').value = task.status;
-            document.getElementById('task-priority').value = task.priority || 0;
+            document.getElementById('task-priority').value = task.priority || 1;
+            document.getElementById('task-assignee').value = task.assignee_id || '';
+            document.getElementById('task-due-date').value = task.due_date ? 
+                task.due_date.slice(0, 16) : '';
+            deleteBtn.style.display = 'inline-flex';
         }
     }
     
     modal.classList.add('active');
 }
 
-function closeModal() {
-    document.getElementById('task-modal').classList.remove('active');
+function closeModal(modalId) {
+    document.getElementById(modalId || 'task-modal').classList.remove('active');
 }
 
 function handleTaskSubmit(event) {
@@ -202,7 +473,9 @@ function handleTaskSubmit(event) {
         title: document.getElementById('task-title').value,
         description: document.getElementById('task-description').value,
         status: document.getElementById('task-status').value,
-        priority: parseInt(document.getElementById('task-priority').value)
+        priority: parseInt(document.getElementById('task-priority').value),
+        assignee_id: document.getElementById('task-assignee').value || null,
+        due_date: document.getElementById('task-due-date').value || null
     };
     
     if (taskId) {
@@ -212,6 +485,13 @@ function handleTaskSubmit(event) {
     }
     
     closeModal();
+}
+
+function deleteCurrentTask() {
+    const taskId = document.getElementById('task-id').value;
+    if (taskId) {
+        deleteTask(parseInt(taskId));
+    }
 }
 
 // Task Details Modal
@@ -239,15 +519,34 @@ async function renderComments(taskId) {
         return;
     }
     
-    container.innerHTML = comments.map(comment => `
-        <div class="comment">
-            <div class="comment-header">
-                <span class="comment-author">${escapeHtml(comment.author)}</span>
-                <span class="comment-date">${new Date(comment.created_at).toLocaleString('ru-RU')}</span>
+    container.innerHTML = comments.map(comment => {
+        // Parse mentions
+        let content = escapeHtml(comment.content);
+        if (comment.mentions) {
+            try {
+                const mentionedIds = JSON.parse(comment.mentions);
+                mentionedIds.forEach(id => {
+                    const mentionedUser = users.find(u => u.id === id);
+                    if (mentionedUser) {
+                        content = content.replace(
+                            `@${mentionedUser.username}`,
+                            `<span class="mention">@${mentionedUser.username}</span>`
+                        );
+                    }
+                });
+            } catch (e) {}
+        }
+        
+        return `
+            <div class="comment">
+                <div class="comment-header">
+                    <span class="comment-author">${escapeHtml(comment.author?.username || 'Unknown')}</span>
+                    <span class="comment-date">${new Date(comment.created_at).toLocaleString('ru-RU')}</span>
+                </div>
+                <div class="comment-content">${content}</div>
             </div>
-            <div class="comment-content">${escapeHtml(comment.content)}</div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 async function addComment() {
@@ -259,53 +558,89 @@ async function addComment() {
     await addComment(currentTaskId, content);
     textarea.value = '';
     await renderComments(currentTaskId);
+    loadActivities();
+}
+
+// Filters
+function applyFilters() {
+    loadTasks();
 }
 
 // Drag and Drop
-function setupDragAndDrop() {
-    const columns = document.querySelectorAll('.column');
-    const cards = document.querySelectorAll('.task-list');
+function drag(ev) {
+    ev.dataTransfer.setData("text", ev.target.dataset.id);
+    ev.target.classList.add('dragging');
+}
+
+function allowDrop(ev) {
+    ev.preventDefault();
+    const column = ev.target.closest('.column');
+    if (column) {
+        column.classList.add('drag-over');
+    }
+}
+
+function drop(ev) {
+    ev.preventDefault();
     
-    cards.forEach(list => {
-        list.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            list.style.background = '#e8ebf0';
-        });
-        
-        list.addEventListener('dragleave', () => {
-            list.style.background = '';
-        });
-        
-        list.addEventListener('drop', async (e) => {
-            e.preventDefault();
-            list.style.background = '';
-            
-            const card = document.querySelector('.task-card.dragging');
-            if (!card) return;
-            
-            const taskId = parseInt(card.dataset.id);
-            const newStatus = list.closest('.column').dataset.status;
-            
-            card.classList.remove('dragging');
-            await updateTask(taskId, { status: newStatus });
-        });
+    // Remove drag-over styles
+    document.querySelectorAll('.column').forEach(col => {
+        col.classList.remove('drag-over');
     });
     
-    document.addEventListener('dragstart', (e) => {
-        if (e.target.classList.contains('task-card')) {
-            e.target.classList.add('dragging');
-        }
-    });
+    const taskId = parseInt(ev.dataTransfer.getData("text"));
+    const column = ev.target.closest('.column');
     
-    document.addEventListener('dragend', (e) => {
-        if (e.target.classList.contains('task-card')) {
-            e.target.classList.remove('dragging');
-        }
+    if (!column) return;
+    
+    const newStatus = column.dataset.status;
+    const task = tasks.find(t => t.id === taskId);
+    
+    if (task && task.status !== newStatus) {
+        moveTask(taskId, newStatus);
+    }
+    
+    document.querySelectorAll('.task-card.dragging').forEach(card => {
+        card.classList.remove('dragging');
     });
+}
+
+// Dark Mode
+function toggleDarkMode() {
+    isDarkMode = !isDarkMode;
+    document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
+    localStorage.setItem('dark_mode', isDarkMode);
+    applyTheme();
+}
+
+function applyTheme() {
+    isDarkMode = localStorage.getTheme === 'true' || 
+                 (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
+}
+
+// Export
+function exportCSV() {
+    window.location.href = `${API_BASE}/export/csv`;
+}
+
+// Toast Notifications
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.animation = 'fadeOut 0.3s ease forwards';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
 }
 
 // Utility
 function escapeHtml(text) {
+    if (!text) return '';
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
@@ -326,3 +661,13 @@ document.addEventListener('keydown', (e) => {
         });
     }
 });
+
+// Add fadeOut animation
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes fadeOut {
+        from { opacity: 1; transform: translateY(0); }
+        to { opacity: 0; transform: translateY(10px); }
+    }
+`;
+document.head.appendChild(style);

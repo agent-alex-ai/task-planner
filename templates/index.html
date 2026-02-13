@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Task Planner - AI Assistant</title>
     <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="/static/css/dark-theme.css" id="dark-theme" disabled>
 </head>
 <body>
     <div class="app">
@@ -15,19 +16,43 @@
                 <span class="badge">AI Assistant Dashboard</span>
             </div>
             <div class="header-right">
-                <div class="stats-summary">
-                    <span class="stat-item">📊 Всего: <strong id="stat-total">0</strong></span>
-                    <span class="stat-item">✅ Выполнено: <strong id="stat-done">0</strong></span>
-                    <span class="stat-item">🔄 В работе: <strong id="stat-progress">0</strong></span>
+                <div class="search-box">
+                    <input type="text" id="search-input" placeholder="🔍 Поиск задач...">
                 </div>
+                <div class="filter-box">
+                    <select id="filter-status" onchange="applyFilters()">
+                        <option value="">📊 Все статусы</option>
+                        <option value="todo">📝 TODO</option>
+                        <option value="in_progress">🔄 В работе</option>
+                        <option value="review">👀 На проверке</option>
+                        <option value="done">✅ Готово</option>
+                    </select>
+                    <select id="filter-priority" onchange="applyFilters()">
+                        <option value="">⭐ Все приоритеты</option>
+                        <option value="2">🔥 Высокий</option>
+                        <option value="1">⭐ Средний</option>
+                        <option value="0">📉 Низкий</option>
+                    </select>
+                </div>
+                <div class="stats-summary">
+                    <span class="stat-item" title="Всего задач">📊 <strong id="stat-total">0</strong></span>
+                    <span class="stat-item" title="Выполнено">✅ <strong id="stat-done">0</strong></span>
+                    <span class="stat-item" title="В работе">🔄 <strong id="stat-progress">0</strong></span>
+                    <span class="stat-item" title="Просрочено" style="color: #e74c3c;">⚠️ <strong id="stat-overdue">0</strong></span>
+                </div>
+                <button class="btn btn-icon" onclick="toggleDarkMode()" title="🌙 Тёмная тема">🌙</button>
+                <button class="btn btn-icon" onclick="exportCSV()" title="📥 Экспорт CSV">📥</button>
                 <button class="btn btn-primary" onclick="openModal('add-task')">+ Новая задача</button>
+                <div class="user-menu">
+                    <span id="current-user">👤</span>
+                </div>
             </div>
         </header>
 
         <!-- Kanban Board -->
-        <div class="board">
+        <div class="board" id="kanban-board">
             <!-- TODO Column -->
-            <div class="column" data-status="todo">
+            <div class="column" data-status="todo" ondrop="drop(event)" ondragover="allowDrop(event)">
                 <div class="column-header">
                     <span class="column-title">📝 TODO</span>
                     <span class="task-count" id="count-todo">0</span>
@@ -38,7 +63,7 @@
             </div>
 
             <!-- IN PROGRESS Column -->
-            <div class="column" data-status="in_progress">
+            <div class="column" data-status="in_progress" ondrop="drop(event)" ondragover="allowDrop(event)">
                 <div class="column-header">
                     <span class="column-title">🔄 В РАБОТЕ</span>
                     <span class="task-count" id="count-in_progress">0</span>
@@ -49,7 +74,7 @@
             </div>
 
             <!-- REVIEW Column -->
-            <div class="column" data-status="review">
+            <div class="column" data-status="review" ondrop="drop(event)" ondragover="allowDrop(event)">
                 <div class="column-header">
                     <span class="column-title">👀 НА ПРОВЕРКЕ</span>
                     <span class="task-count" id="count-review">0</span>
@@ -60,7 +85,7 @@
             </div>
 
             <!-- DONE Column -->
-            <div class="column" data-status="done">
+            <div class="column" data-status="done" ondrop="drop(event)" ondragover="allowDrop(event)">
                 <div class="column-header">
                     <span class="column-title">✅ ГОТОВО</span>
                     <span class="task-count" id="count-done">0</span>
@@ -70,6 +95,17 @@
                 </div>
             </div>
         </div>
+
+        <!-- Activity Feed -->
+        <aside class="activity-sidebar" id="activity-sidebar">
+            <div class="activity-header">
+                <h3>📋 Активность</h3>
+                <button class="btn btn-small" onclick="loadActivities()">🔄</button>
+            </div>
+            <div class="activity-list" id="activity-list">
+                <!-- Activities will be rendered here -->
+            </div>
+        </aside>
     </div>
 
     <!-- Task Modal -->
@@ -82,7 +118,7 @@
             <form id="task-form" onsubmit="handleTaskSubmit(event)">
                 <input type="hidden" id="task-id">
                 <div class="form-group">
-                    <label>Название</label>
+                    <label>Название *</label>
                     <input type="text" id="task-title" required placeholder="Что нужно сделать?">
                 </div>
                 <div class="form-group">
@@ -102,14 +138,29 @@
                     <div class="form-group">
                         <label>Приоритет</label>
                         <select id="task-priority">
-                            <option value="0">⭐ Обычный</option>
-                            <option value="1">🔥 Высокий</option>
+                            <option value="0">📉 Низкий</option>
+                            <option value="1" selected>⭐ Средний</option>
+                            <option value="2">🔥 Высокий</option>
                         </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Исполнитель</label>
+                        <select id="task-assignee">
+                            <option value="">🤖 AI</option>
+                            <!-- Users will be populated -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Дедлайн</label>
+                        <input type="datetime-local" id="task-due-date">
                     </div>
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeModal()">Отмена</button>
-                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                    <button type="button" class="btn btn-danger" id="delete-task-btn" onclick="deleteCurrentTask()" style="display:none;">🗑️ Удалить</button>
+                    <button type="submit" class="btn btn-primary">💾 Сохранить</button>
                 </div>
             </form>
         </div>
@@ -126,11 +177,67 @@
                 <!-- Comments will be rendered here -->
             </div>
             <div class="comment-form">
-                <textarea id="new-comment" rows="2" placeholder="Написать комментарий..."></textarea>
-                <button class="btn btn-primary" onclick="addComment()">Отправить</button>
+                <textarea id="new-comment" rows="2" placeholder="💬 Написать комментарий... (используй @username для упоминания)"></textarea>
+                <button class="btn btn-primary" onclick="addComment()">📤 Отправить</button>
             </div>
         </div>
     </div>
+
+    <!-- Login Modal -->
+    <div class="modal active" id="login-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🔐 Вход</h2>
+            </div>
+            <form id="login-form" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label>Имя пользователя</label>
+                    <input type="text" id="login-username" required placeholder="username">
+                </div>
+                <div class="form-group">
+                    <label>Пароль</label>
+                    <input type="password" id="login-password" required placeholder="password">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" style="width:100%">🔓 Войти</button>
+                </div>
+                <div class="form-group" style="text-align:center;">
+                    <a href="#" onclick="showRegister(); return false;">📝 Регистрация</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Register Modal -->
+    <div class="modal" id="register-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📝 Регистрация</h2>
+                <button class="close-btn" onclick="closeRegisterModal()">&times;</button>
+            </div>
+            <form id="register-form" onsubmit="handleRegister(event)">
+                <div class="form-group">
+                    <label>Имя пользователя</label>
+                    <input type="text" id="reg-username" required placeholder="username">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="reg-email" required placeholder="email@example.com">
+                </div>
+                <div class="form-group">
+                    <label>Пароль</label>
+                    <input type="password" id="reg-password" required placeholder="минимум 8 символов">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeRegisterModal()">Отмена</button>
+                    <button type="submit" class="btn btn-primary">📝 Зарегистрироваться</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toast-container"></div>
 
     <script src="/static/js/app.js"></script>
 </body>

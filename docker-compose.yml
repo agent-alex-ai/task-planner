@@ -1,0 +1,68 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: task-planner-db
+    environment:
+      POSTGRES_USER: ${DB_USER:-taskplanner}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-taskplanner_secret}
+      POSTGRES_DB: ${DB_NAME:-taskplanner}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-taskplanner}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: task-planner-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: task-planner-app
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-taskplanner}:${DB_PASSWORD:-taskplanner_secret}@postgres:5432/${DB_NAME:-taskplanner}
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
+      - FLASK_ENV=${FLASK_ENV:-development}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-jwt-secret-change-in-production}
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./static:/app/static
+      - ./templates:/app/templates
+      - ./uploads:/app/uploads
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: task-planner-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

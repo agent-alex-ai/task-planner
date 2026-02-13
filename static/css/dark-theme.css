@@ -1,0 +1,237 @@
+/* Dark Theme Styles */
+[data-theme="dark"] {
+    --bg-primary: #1a1a2e;
+    --bg-secondary: #16213e;
+    --text-primary: #e8e8e8;
+    --text-secondary: #a0a0a0;
+    --border-color: #2d3a5a;
+    --shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    --shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.4);
+    
+    --todo-color: #4a90d9;
+    --in-progress-color: #e67e22;
+    --review-color: #8e44ad;
+    --done-color: #27ae60;
+    
+    background: var(--bg-primary);
+}
+
+[data-theme="dark"] body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .header {
+    background: var(--bg-secondary);
+    border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .header h1 {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .badge {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+[data-theme="dark"] .column {
+    background: #1e2a3a;
+}
+
+[data-theme="dark"] .column-header {
+    border-bottom-color: var(--border-color);
+    background: var(--bg-secondary);
+}
+
+[data-theme="dark"] .column-title {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .task-count {
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .task-card {
+    background: var(--bg-secondary);
+    box-shadow: var(--shadow);
+}
+
+[data-theme="dark"] .task-card:hover {
+    box-shadow: var(--shadow-hover);
+}
+
+[data-theme="dark"] .task-title {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .task-meta {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .task-assignee {
+    background: var(--bg-primary);
+}
+
+[data-theme="dark"] .modal-content {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+}
+
+[data-theme="dark"] .modal-header {
+    border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .modal-header h2 {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .close-btn {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .close-btn:hover {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .form-group label {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .form-group input,
+[data-theme="dark"] .form-group textarea,
+[data-theme="dark"] .form-group select {
+    background: var(--bg-primary);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .form-group input:focus,
+[data-theme="dark"] .form-group textarea:focus,
+[data-theme="dark"] .form-group select:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+}
+
+[data-theme="dark"] .form-actions {
+    border-top-color: var(--border-color);
+}
+
+[data-theme="dark"] .btn-secondary {
+    background: var(--bg-primary);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .btn-secondary:hover {
+    background: var(--border-color);
+}
+
+[data-theme="dark"] .btn-danger {
+    background: #c0392b;
+    color: white;
+}
+
+[data-theme="dark"] .comment {
+    background: var(--bg-primary);
+}
+
+[data-theme="dark"] .comment-author {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .comment-date {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .comment-form textarea {
+    background: var(--bg-primary);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .search-box input {
+    background: var(--bg-primary);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .search-box input::placeholder {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .filter-box select {
+    background: var(--bg-primary);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .stat-item {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .stat-item strong {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .activity-sidebar {
+    background: var(--bg-secondary);
+    border-left-color: var(--border-color);
+}
+
+[data-theme="dark"] .activity-header {
+    border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .activity-header h3 {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .activity-item {
+    background: var(--bg-primary);
+}
+
+[data-theme="dark"] .activity-content {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .activity-time {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .toast {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+[data-theme="dark"] .toast.success {
+    border-left-color: #27ae60;
+}
+
+[data-theme="dark"] .toast.error {
+    border-left-color: #c0392b;
+}
+
+[data-theme="dark"] .toast.info {
+    border-left-color: #3498db;
+}
+
+/* Scrollbar styling for dark theme */
+[data-theme="dark"] ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+    background: #4a5568;
+}
