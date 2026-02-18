@@ -1,249 +1,419 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Task Planner - AI Assistant</title>
-    <link rel="stylesheet" href="/static/css/styles.css">
-    <link rel="stylesheet" href="/static/css/dark-theme.css" id="dark-theme" disabled>
+    <title>SaaS Ideas Tracker</title>
+    <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-tertiary: #0f3460;
+            --text-primary: #eee;
+            --text-secondary: #aaa;
+            --accent: #00d9ff;
+            --danger: #e94560;
+            --success: #00ff88;
+        }
+        .theme-light {
+            --bg-primary: #f5f5f5;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #e0e0e0;
+            --text-primary: #333;
+            --text-secondary: #666;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; display: flex; flex-direction: column; }
+        
+        .header { background: var(--bg-secondary); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .header h1 { font-size: 18px; color: var(--accent); }
+        .header .stats { font-size: 12px; color: var(--text-secondary); display: flex; gap: 15px; }
+        .header .stats span { background: var(--bg-tertiary); padding: 4px 10px; border-radius: 12px; }
+        
+        .controls { background: var(--bg-secondary); padding: 15px 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        .search-box { flex: 1; min-width: 200px; }
+        .search-box input { width: 100%; padding: 10px 15px; background: var(--bg-tertiary); border: 1px solid var(--bg-tertiary); color: var(--text-primary); border-radius: 8px; font-size: 14px; }
+        .search-box input:focus { outline: none; border-color: var(--accent); }
+        .filter-select { padding: 10px 15px; background: var(--bg-tertiary); border: 1px solid var(--bg-tertiary); color: var(--text-primary); border-radius: 8px; font-size: 14px; cursor: pointer; }
+        .btn { padding: 10px 15px; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+        .btn:hover { opacity: 0.8; transform: translateY(-1px); }
+        .btn-add { background: var(--accent); color: var(--bg-primary); font-weight: 600; }
+        .btn-export { background: var(--success); color: var(--bg-primary); }
+        .btn-theme { background: var(--bg-tertiary); color: var(--text-primary); }
+        
+        .main { flex: 1; padding: 20px; overflow: auto; }
+        table { width: 100%; border-collapse: collapse; background: var(--bg-secondary); border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+        th, td { padding: 14px 12px; text-align: left; border-bottom: 1px solid var(--bg-tertiary); }
+        th { background: var(--bg-tertiary); font-weight: 600; font-size: 12px; color: var(--accent); cursor: pointer; user-select: none; }
+        th:hover { background: #1a4a7a; }
+        td { font-size: 13px; }
+        tr:hover { background: var(--bg-tertiary); }
+        
+        .interested-yes { color: var(--success); font-weight: 600; }
+        .interested-no { color: var(--danger); }
+        
+        .actions { display: flex; gap: 5px; }
+        .btn-icon { padding: 6px 10px; font-size: 14px; }
+        
+        .pagination { display: flex; justify-content: center; gap: 5px; padding: 20px; }
+        .pagination button { padding: 8px 12px; background: var(--bg-secondary); border: 1px solid var(--bg-tertiary); color: var(--text-primary); border-radius: 6px; cursor: pointer; }
+        .pagination button.active { background: var(--accent); color: var(--bg-primary); }
+        .pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .empty { text-align: center; padding: 40px; color: var(--text-secondary); }
+        
+        .log-panel { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg-secondary); border-top: 2px solid var(--accent); z-index: 100; }
+        .log-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background: var(--bg-tertiary); cursor: pointer; }
+        .log-header:hover { opacity: 0.9; }
+        .log-title { font-size: 12px; color: var(--accent); font-weight: 600; }
+        .log-toggle { font-size: 10px; color: var(--text-secondary); }
+        .log-content { max-height: 0; overflow: hidden; transition: max-height 0.3s; }
+        .log-content.expanded { max-height: 250px; overflow: auto; }
+        .log-entry { padding: 6px 20px; font-family: monospace; font-size: 11px; border-bottom: 1px solid var(--bg-tertiary); display: flex; gap: 15px; }
+        .log-entry .date { color: var(--text-secondary); }
+        .log-entry .time { color: var(--accent); }
+        .log-entry .action { color: var(--danger); }
+        .log-entry .details { color: var(--text-secondary); flex: 1; }
+        
+        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 200; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: var(--bg-secondary); padding: 25px; border-radius: 12px; width: 90%; max-width: 550px; max-height: 90vh; overflow: auto; }
+        .modal h2 { margin-bottom: 20px; color: var(--accent); }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 12px; background: var(--bg-tertiary); border: 1px solid var(--bg-tertiary); color: var(--text-primary); border-radius: 6px; font-size: 14px; }
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus { outline: none; border-color: var(--accent); }
+        .form-group textarea { height: 70px; resize: vertical; }
+        .form-group.full { grid-column: 1 / -1; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+        .modal-actions .btn { padding: 12px 24px; }
+        .btn-cancel { background: var(--bg-tertiary); color: var(--text-primary); }
+        
+        @media (max-width: 768px) {
+            .form-row { grid-template-columns: 1fr; }
+            .header .stats { display: none; }
+        }
+    </style>
 </head>
-<body data-requires-auth="{{ 'true' if requires_auth else 'false' }}" data-login-page="{{ 'true' if login_page else 'false' }}">
-    <!-- Main App - hidden if not authenticated -->
-    <div class="app" id="main-app" style="display: none;">
-        <!-- Header -->
-        <header class="header">
-            <div class="header-left">
-                <h1>📋 Task Planner</h1>
-                <span class="badge">AI Assistant Dashboard</span>
-            </div>
-            <div class="header-right">
-                <div class="search-box">
-                    <input type="text" id="search-input" placeholder="🔍 Поиск задач...">
-                </div>
-                <div class="filter-box">
-                    <select id="filter-status" onchange="applyFilters()">
-                        <option value="">📊 Все статусы</option>
-                        <option value="todo">📝 TODO</option>
-                        <option value="in_progress">🔄 В работе</option>
-                        <option value="review">👀 На проверке</option>
-                        <option value="done">✅ Готово</option>
-                    </select>
-                    <select id="filter-priority" onchange="applyFilters()">
-                        <option value="">⭐ Все приоритеты</option>
-                        <option value="2">🔥 Высокий</option>
-                        <option value="1">⭐ Средний</option>
-                        <option value="0">📉 Низкий</option>
-                    </select>
-                </div>
-                <div class="stats-summary">
-                    <span class="stat-item" title="Всего задач">📊 <strong id="stat-total">0</strong></span>
-                    <span class="stat-item" title="Выполнено">✅ <strong id="stat-done">0</strong></span>
-                    <span class="stat-item" title="В работе">🔄 <strong id="stat-progress">0</strong></span>
-                    <span class="stat-item" title="Просрочено" style="color: #e74c3c;">⚠️ <strong id="stat-overdue">0</strong></span>
-                </div>
-                <button class="btn btn-icon" onclick="toggleDarkMode()" title="🌙 Тёмная тема">🌙</button>
-                <button class="btn btn-icon" onclick="exportCSV()" title="📥 Экспорт CSV">📥</button>
-                <button class="btn btn-primary" onclick="openModal('add-task')">+ Новая задача</button>
-                <div class="user-menu">
-                    <button class="btn btn-user" id="current-user" onclick="toggleUserMenu()">👤</button>
-                    <div class="user-dropdown" id="user-dropdown">
-                        <button class="btn btn-logout" onclick="logout()">🚪 Выйти</button>
-                    </div>
-                </div>
-            </div>
-        </header>
-
-        <!-- Kanban Board -->
-        <div class="board" id="kanban-board">
-            <!-- TODO Column -->
-            <div class="column" data-status="todo" ondrop="drop(event)" ondragover="allowDrop(event)">
-                <div class="column-header">
-                    <span class="column-title">📝 TODO</span>
-                    <span class="task-count" id="count-todo">0</span>
-                </div>
-                <div class="task-list" id="todo-list">
-                    <!-- Tasks will be rendered here -->
-                </div>
-            </div>
-
-            <!-- IN PROGRESS Column -->
-            <div class="column" data-status="in_progress" ondrop="drop(event)" ondragover="allowDrop(event)">
-                <div class="column-header">
-                    <span class="column-title">🔄 В РАБОТЕ</span>
-                    <span class="task-count" id="count-in_progress">0</span>
-                </div>
-                <div class="task-list" id="in_progress-list">
-                    <!-- Tasks will be rendered here -->
-                </div>
-            </div>
-
-            <!-- REVIEW Column -->
-            <div class="column" data-status="review" ondrop="drop(event)" ondragover="allowDrop(event)">
-                <div class="column-header">
-                    <span class="column-title">👀 НА ПРОВЕРКЕ</span>
-                    <span class="task-count" id="count-review">0</span>
-                </div>
-                <div class="task-list" id="review-list">
-                    <!-- Tasks will be rendered here -->
-                </div>
-            </div>
-
-            <!-- DONE Column -->
-            <div class="column" data-status="done" ondrop="drop(event)" ondragover="allowDrop(event)">
-                <div class="column-header">
-                    <span class="column-title">✅ ГОТОВО</span>
-                    <span class="task-count" id="count-done">0</span>
-                </div>
-                <div class="task-list" id="done-list">
-                    <!-- Tasks will be rendered here -->
-                </div>
-            </div>
+<body>
+    <div class="header">
+        <h1>📊 SaaS Ideas Tracker</h1>
+        <div class="stats">
+            <span>📚 Всего: <strong id="totalCount">0</strong></span>
+            <span>❤️ Интересно: <strong id="interestingCount">0</strong></span>
         </div>
-
-        <!-- Activity Feed -->
-        <aside class="activity-sidebar" id="activity-sidebar">
-            <div class="activity-header">
-                <h3>📋 Активность</h3>
-                <button class="btn btn-small" onclick="loadActivities()">🔄</button>
-            </div>
-            <div class="activity-list" id="activity-list">
-                <!-- Activities will be rendered here -->
-            </div>
-        </aside>
     </div>
-</div>
-
-    <!-- Task Modal -->
-    <div class="modal" id="task-modal">
+    
+    <div class="controls">
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="🔍 Поиск по названию или описанию...">
+        </div>
+        <select class="filter-select" id="filterSelect">
+            <option value="">Все идеи</option>
+            <option value="Да">Только интересные</option>
+            <option value="Нет">Неинтересные</option>
+        </select>
+        <button class="btn btn-export" onclick="exportCSV()">📥 CSV</button>
+        <button class="btn btn-theme" onclick="toggleTheme()">🌓</button>
+        <button class="btn btn-add" onclick="openModal()">+ Добавить</button>
+    </div>
+    
+    <div class="main">
+        <table>
+            <thead>
+                <tr>
+                    <th data-sort="0">№</th>
+                    <th data-sort="1">Название</th>
+                    <th data-sort="2">Описание</th>
+                    <th data-sort="4">Инструменты</th>
+                    <th data-sort="6">Монетизация</th>
+                    <th data-sort="9">Интересно?</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody id="ideasTable"></tbody>
+        </table>
+        <div class="empty" id="emptyState" style="display:none;">Ничего не найдено</div>
+    </div>
+    
+    <div class="pagination" id="pagination"></div>
+    
+    <div class="log-panel">
+        <div class="log-header" onclick="toggleLog()">
+            <span class="log-title">📜 Лог (последние 5)</span>
+            <span class="log-toggle">▲ развернуть / ▼ свернуть</span>
+        </div>
+        <div class="log-content" id="logContent"></div>
+    </div>
+    
+    <div class="modal" id="ideaModal">
         <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="modal-title">Новая задача</h2>
-                <button class="close-btn" onclick="closeModal()">&times;</button>
-            </div>
-            <form id="task-form" onsubmit="handleTaskSubmit(event)">
-                <input type="hidden" id="task-id">
-                <div class="form-group">
-                    <label>Название *</label>
-                    <input type="text" id="task-title" required placeholder="Что нужно сделать?">
-                </div>
-                <div class="form-group">
-                    <label>Описание</label>
-                    <textarea id="task-description" rows="3" placeholder="Подробности задачи..."></textarea>
-                </div>
+            <h2 id="modalTitle">Добавить идею</h2>
+            <form id="ideaForm">
+                <input type="hidden" id="ideaRow">
                 <div class="form-row">
-                    <div class="form-group">
-                        <label>Статус</label>
-                        <select id="task-status">
-                            <option value="todo">📝 TODO</option>
-                            <option value="in_progress">🔄 В работе</option>
-                            <option value="review">👀 На проверке</option>
-                            <option value="done">✅ Готово</option>
-                        </select>
+                    <div class="form-group full">
+                        <label>Название проекта</label>
+                        <input type="text" id="ideaName" required>
+                    </div>
+                    <div class="form-group full">
+                        <label>Описание</label>
+                        <textarea id="ideaDesc"></textarea>
                     </div>
                     <div class="form-group">
-                        <label>Приоритет</label>
-                        <select id="task-priority">
-                            <option value="0">📉 Низкий</option>
-                            <option value="1" selected>⭐ Средний</option>
-                            <option value="2">🔥 Высокий</option>
+                        <label>GitHub</label>
+                        <input type="text" id="ideaGithub" placeholder="https://github.com/...">
+                    </div>
+                    <div class="form-group">
+                        <label>Инструменты</label>
+                        <input type="text" id="ideaTools" placeholder="Python, React, ...">
+                    </div>
+                    <div class="form-group">
+                        <label>Аналоги/Конкуренты</label>
+                        <input type="text" id="ideaAlternatives">
+                    </div>
+                    <div class="form-group">
+                        <label>Монетизация</label>
+                        <input type="text" id="ideaMonetization" placeholder="$10/мес">
+                    </div>
+                    <div class="form-group">
+                        <label>Затраты ($)</label>
+                        <input type="text" id="ideaCost" placeholder="$1000-5000">
+                    </div>
+                    <div class="form-group">
+                        <label>Время (дней)</label>
+                        <input type="text" id="ideaTime" placeholder="30-60">
+                    </div>
+                    <div class="form-group">
+                        <label>Интересно?</label>
+                        <select id="ideaInterested">
+                            <option value="Да">Да</option>
+                            <option value="Нет">Нет</option>
                         </select>
                     </div>
                 </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Исполнитель</label>
-                        <select id="task-assignee">
-                            <option value="">🤖 AI</option>
-                            <!-- Users will be populated -->
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Дедлайн</label>
-                        <input type="datetime-local" id="task-due-date">
-                    </div>
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Отмена</button>
-                    <button type="button" class="btn btn-danger" id="delete-task-btn" onclick="deleteCurrentTask()" style="display:none;">🗑️ Удалить</button>
-                    <button type="submit" class="btn btn-primary">💾 Сохранить</button>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-cancel" onclick="closeModal()">Отмена</button>
+                    <button type="submit" class="btn btn-add">Сохранить</button>
                 </div>
             </form>
         </div>
     </div>
-
-    <!-- Comments Modal -->
-    <div class="modal" id="comments-modal">
-        <div class="modal-content modal-large">
-            <div class="modal-header">
-                <h2 id="comments-title">Комментарии</h2>
-                <button class="close-btn" onclick="closeCommentsModal()">&times;</button>
-            </div>
-            <div class="comments-list" id="comments-list">
-                <!-- Comments will be rendered here -->
-            </div>
-            <div class="comment-form">
-                <textarea id="new-comment" rows="2" placeholder="💬 Написать комментарий... (используй @username для упоминания)"></textarea>
-                <button class="btn btn-primary" onclick="addComment()">📤 Отправить</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Login Modal -->
-    <div class="modal active" id="login-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>🔐 Вход</h2>
-            </div>
-            <form id="login-form" onsubmit="handleLogin(event)">
-                <div class="form-group">
-                    <label>Имя пользователя</label>
-                    <input type="text" id="login-username" required placeholder="username">
-                </div>
-                <div class="form-group">
-                    <label>Пароль</label>
-                    <input type="password" id="login-password" required placeholder="password">
-                </div>
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" style="width:100%">🔓 Войти</button>
-                </div>
-                <div class="form-group" style="text-align:center;">
-                    <a href="#" onclick="showRegister(); return false;">📝 Регистрация</a>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Register Modal -->
-    <div class="modal" id="register-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>📝 Регистрация</h2>
-                <button class="close-btn" onclick="closeRegisterModal()">&times;</button>
-            </div>
-            <form id="register-form" onsubmit="handleRegister(event)">
-                <div class="form-group">
-                    <label>Имя пользователя</label>
-                    <input type="text" id="reg-username" required placeholder="username">
-                </div>
-                <div class="form-group">
-                    <label>Email</label>
-                    <input type="email" id="reg-email" required placeholder="email@example.com">
-                </div>
-                <div class="form-group">
-                    <label>Пароль</label>
-                    <input type="password" id="reg-password" required placeholder="минимум 8 символов">
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeRegisterModal()">Отмена</button>
-                    <button type="submit" class="btn btn-primary">📝 Зарегистрироваться</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Toast Notifications -->
-    <div class="toast-container" id="toast-container"></div>
-
-    <script src="/static/js/app.js"></script>
+    
+    <script>
+        let allIdeas = [];
+        let filteredIdeas = [];
+        let currentPage = 1;
+        const perPage = 15;
+        let sortCol = 0;
+        let sortAsc = false;
+        
+        fetch('/api/ideas').then(r => r.json()).then(data => {
+            allIdeas = data.slice(1);
+            filteredIdeas = [...allIdeas];
+            updateStats();
+            renderTable();
+        });
+        
+        fetch('/api/stats').then(r => r.json()).then(s => {
+            document.getElementById('totalCount').textContent = s.total;
+            document.getElementById('interestingCount').textContent = s.interesting;
+        });
+        
+        function filterAndSort() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const filter = document.getElementById('filterSelect').value;
+            
+            filteredIdeas = allIdeas.filter(row => {
+                const matchSearch = !search || 
+                    (row[1] || '').toLowerCase().includes(search) || 
+                    (row[2] || '').toLowerCase().includes(search);
+                const matchFilter = !filter || row[9] === filter;
+                return matchSearch && matchFilter;
+            });
+            
+            filteredIdeas.sort((a, b) => {
+                let va = a[sortCol] || '';
+                let vb = b[sortCol] || '';
+                if (!isNaN(va) && !isNaN(vb)) { va = Number(va); vb = Number(vb); }
+                if (va < vb) return sortAsc ? -1 : 1;
+                if (va > vb) return sortAsc ? 1 : -1;
+                return 0;
+            });
+            
+            currentPage = 1;
+            renderTable();
+        }
+        
+        document.getElementById('searchInput').addEventListener('input', filterAndSort);
+        document.getElementById('filterSelect').addEventListener('change', filterAndSort);
+        
+        document.querySelectorAll('th[data-sort]').forEach(th => {
+            th.addEventListener('click', () => {
+                const col = parseInt(th.dataset.sort);
+                if (sortCol === col) sortAsc = !sortAsc;
+                else { sortCol = col; sortAsc = true; }
+                document.querySelectorAll('th').forEach(t => t.removeAttribute('class'));
+                th.className = sortAsc ? 'asc' : 'desc';
+                filterAndSort();
+            });
+        });
+        
+        function renderTable() {
+            const tbody = document.getElementById('ideasTable');
+            const start = (currentPage - 1) * perPage;
+            const pageData = filteredIdeas.slice(start, start + perPage);
+            
+            if (pageData.length === 0) {
+                tbody.innerHTML = '';
+                document.getElementById('emptyState').style.display = 'block';
+                document.getElementById('pagination').style.display = 'none';
+                return;
+            }
+            
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('pagination').style.display = 'flex';
+            
+            tbody.innerHTML = pageData.map((row, i) => {
+                const num = start + i + 1;
+                const numVal = row[0] || num;
+                const interestedClass = row[9] === 'Да' ? 'interested-yes' : 'interested-no';
+                return '<tr>' +
+                    '<td>' + (row[0] || num) + '</td>' +
+                    '<td><strong>' + (row[1] || '') + '</strong></td>' +
+                    '<td>' + ((row[2] || '').slice(0, 60)) + ((row[2] || '').length > 60 ? '...' : '') + '</td>' +
+                    '<td>' + ((row[4] || '').slice(0, 30)) + '</td>' +
+                    '<td>' + (row[6] || '') + '</td>' +
+                    '<td class="' + interestedClass + '">' + (row[9] || 'Нет') + '</td>' +
+                    '<td class="actions">' +
+                    '<button class="btn btn-icon" onclick="editIdea(' + numVal + ')">✏️</button>' +
+                    '<button class="btn btn-icon" onclick="deleteIdea(' + numVal + ')">🗑️</button>' +
+                    '</td></tr>';
+            }).join('');
+            
+            renderPagination();
+        }
+        
+        function renderPagination() {
+            const totalPages = Math.ceil(filteredIdeas.length / perPage);
+            const p = document.getElementById('pagination');
+            if (totalPages <= 1) { p.innerHTML = ''; return; }
+            
+            let html = '<button ' + (currentPage === 1 ? 'disabled' : '') + ' onclick="goPage(' + (currentPage - 1) + ')">←</button>';
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === 1 || i === totalPages || Math.abs(i - currentPage) <= 2) {
+                    html += '<button class="' + (i === currentPage ? 'active' : '') + '" onclick="goPage(' + i + ')">' + i + '</button>';
+                } else if (i === currentPage - 3 || i === currentPage + 3) {
+                    html += '<button disabled>...</button>';
+                }
+            }
+            html += '<button ' + (currentPage === totalPages ? 'disabled' : '') + ' onclick="goPage(' + (currentPage + 1) + ')">→</button>';
+            p.innerHTML = html;
+        }
+        
+        function goPage(n) { currentPage = n; renderTable(); }
+        
+        function toggleTheme() {
+            document.body.classList.toggle('theme-light');
+            localStorage.setItem('theme', document.body.classList.contains('theme-light') ? 'light' : 'dark');
+        }
+        
+        if (localStorage.getItem('theme') === 'light') document.body.classList.add('theme-light');
+        
+        function toggleLog() {
+            document.getElementById('logContent').classList.toggle('expanded');
+        }
+        
+        function openModal() {
+            document.getElementById('modalTitle').textContent = 'Добавить идею';
+            document.getElementById('ideaRow').value = '';
+            document.getElementById('ideaForm').reset();
+            document.getElementById('ideaModal').classList.add('active');
+        }
+        
+        function editIdea(row) {
+            fetch('/api/idea/' + row).then(r => r.json()).then(idea => {
+                document.getElementById('modalTitle').textContent = 'Редактировать идею';
+                document.getElementById('ideaRow').value = row;
+                document.getElementById('ideaName').value = idea['название проекта'] || '';
+                document.getElementById('ideaDesc').value = idea['описание'] || '';
+                document.getElementById('ideaGithub').value = idea['ссылка на github'] || '';
+                document.getElementById('ideaTools').value = idea['инструменты'] || '';
+                document.getElementById('ideaAlternatives').value = idea['аналоги/конкуренты'] || '';
+                document.getElementById('ideaMonetization').value = idea['монетизация'] || '';
+                document.getElementById('ideaCost').value = idea['затраты ($)'] || '';
+                document.getElementById('ideaTime').value = idea['время (дней)'] || '';
+                document.getElementById('ideaInterested').value = idea['интересно?'] || 'Нет';
+                document.getElementById('ideaModal').classList.add('active');
+            });
+        }
+        
+        function deleteIdea(row) {
+            if (confirm('Удалить идею #' + row + '?')) {
+                fetch('/api/idea/' + row, {method: 'DELETE'}).then(() => location.reload());
+            }
+        }
+        
+        document.getElementById('ideaForm').onsubmit = function(e) {
+            e.preventDefault();
+            const row = document.getElementById('ideaRow').value;
+            const data = {
+                name: document.getElementById('ideaName').value,
+                description: document.getElementById('ideaDesc').value,
+                github: document.getElementById('ideaGithub').value,
+                tools: document.getElementById('ideaTools').value,
+                alternatives: document.getElementById('ideaAlternatives').value,
+                monetization: document.getElementById('ideaMonetization').value,
+                cost: document.getElementById('ideaCost').value,
+                time: document.getElementById('ideaTime').value,
+                interested: document.getElementById('ideaInterested').value
+            };
+            
+            const method = row ? 'PUT' : 'POST';
+            const url = row ? '/api/idea/' + row : '/api/idea';
+            
+            fetch(url, {
+                method: method,
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(r => r.json()).then(() => {
+                closeModal();
+                location.reload();
+            });
+        };
+        
+        function closeModal() {
+            document.getElementById('ideaModal').classList.remove('active');
+        }
+        
+        function exportCSV() {
+            let csv = '№,Название,Описание,GitHub,Инструменты,Аналоги,Монетизация,Затраты,Время,Интересно,Дата\n';
+            filteredIdeas.forEach(row => {
+                csv += row.map(c => '"' + (c || '').replace(/"/g, '""') + '"').join(',') + '\n';
+            });
+            const blob = new Blob([csv], {type: 'text/csv'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'saas-ideas-' + new Date().toISOString().slice(0,10) + '.csv';
+            a.click();
+        }
+        
+        setInterval(() => {
+            fetch('/api/logs').then(r => r.json()).then(logs => {
+                const container = document.getElementById('logContent');
+                container.innerHTML = logs.slice(-5).reverse().map(e => 
+                    '<div class="log-entry"><span class="date">' + e.date + '</span><span class="time">' + e.time + '</span><span class="action">' + e.action + '</span><span class="details">' + e.details + '</span></div>'
+                ).join('');
+            });
+        }, 5000);
+        
+        fetch('/api/logs').then(r => r.json()).then(logs => {
+            const container = document.getElementById('logContent');
+            container.innerHTML = logs.slice(-5).reverse().map(e => 
+                '<div class="log-entry"><span class="date">' + e.date + '</span><span class="time">' + e.time + '</span><span class="action">' + e.action + '</span><span class="details">' + e.details + '</span></div>'
+            ).join('');
+        });
+    </script>
 </body>
 </html>
