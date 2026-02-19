@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
 """
-Канбан доска (Trello-style) - автономная версия
-Данные хранятся в JSON файле
+Канбан доска - использует PostgreSQL базу данных проекта
 """
 
 import os
-import json
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template_string
+from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
 
-DATA_FILE = "kanban_data.json"
+# Подключение к PostgreSQL
+DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://taskplanner:taskplanner_secret@localhost:5432/taskplanner')
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Логи
+db = SQLAlchemy(app)
+
+# Логи в памяти
 LOG_STORAGE = []
 
 def log(action, details=""):
@@ -21,17 +25,29 @@ def log(action, details=""):
     LOG_STORAGE.append(entry)
     print(f"[{entry['time']}] {action}: {details}")
 
-def load_cards():
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return []
+# Маппинг статусов канбана на статусы в БД
+COLUMN_STATUS_MAP = {
+    'New': 'todo',
+    'In Progress': 'in_progress', 
+    'Done': 'done'
+}
 
-def save_cards(cards):
-    with open(DATA_FILE, 'w', encoding='utf-8') as f:
-        json.dump(cards, f, ensure_ascii=False, indent=2)
-
+REVERSE_STATUS_MAP = {v: k for k, v in COLUMN_STATUS_MAP.items()}
 COLUMNS = ['New', 'In Progress', 'Done']
+
+class Task(db.Model):
+    __tablename__ = 'tasks'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text)
+    status = db.Column(db.String(20), default='todo')
+    priority = db.Column(db.Integer, default=1)
+    due_date = db.Column(db.Date)
+    author_id = db.Column(db.Integer, nullable=False)
+    assignee_id = db.Column(db.Integer)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 HTML = '''
 <!DOCTYPE html>
@@ -52,7 +68,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .column-header{padding:15px;border-bottom:1px solid var(--bg3);display:flex;justify-content:space-between;align-items:center}
 .column-title{font-weight:600;font-size:14px;text-transform:uppercase}
 .col-new .column-title{color:var(--new)}
-.col-progress .column-title{color:var(--prog)}
+.col-in-progress .column-title{color:var(--prog)}
 .col-done .column-title{color:var(--done)}
 .column-count{background:var(--bg3);padding:2px 8px;border-radius:10px;font-size:12px}
 .column-cards{padding:10px;flex:1;overflow-y:auto;min-height:100px}
@@ -113,14 +129,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 const COLUMNS = ['New','In Progress','Done'];
 let cards = [];
 fetch('/api/cards').then(r=>r.json()).then(d=>{cards=d;render()});
+function getStatus(col){
+const map={'New':'todo','In Progress':'in_progress','Done':'done'};
+return map[col]||'todo';
+}
 function render(){
 document.getElementById('board').innerHTML=COLUMNS.map(col=>{
-const colCards=cards.filter(c=>c.status===col);
+const colCards=cards.filter(c=>getStatus(col)===c.status);
 return`<div class="column col-${col.toLowerCase().replace(' ','-')}" ondragover="drago(event)" ondrop="drop(event,'${col}')">
 <div class="column-header"><span class="column-title">${col}</span><span class="column-count">${colCards.length}</span></div>
 <div class="column-cards">
 ${colCards.map(c=>`<div class="card" draggable="true" ondragstart="drag(event,${c.id})">
-<div class="card-title">${c.name}</div>
+<div class="card-title">${c.title}</div>
 <div class="card-desc">${c.description||''}</div>
 <div class="card-actions">
 <button class="card-btn" onclick="ed(${c.id})">✏️</button>
@@ -130,11 +150,11 @@ ${colCards.map(c=>`<div class="card" draggable="true" ondragstart="drag(event,${
 let dragId=null;
 function drag(e,id){dragId=id}
 function drago(e){e.preventDefault();e.currentTarget.classList.add('dropping')}
-function drop(e,col){e.preventDefault();e.currentTarget.classList.remove('dropping');if(dragId){fetch('/api/card/'+dragId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:col})}).then(()=>fetch('/api/cards').then(r=>r.json()).then(d=>{cards=d;render()}))}}
+function drop(e,col){e.preventDefault();e.currentTarget.classList.remove('dropping');if(dragId){fetch('/api/card/'+dragId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:getStatus(col)})}).then(()=>fetch('/api/cards').then(r=>r.json()).then(d=>{cards=d;render()}))}}
 function openModal(){document.getElementById('mt').textContent='Новая';document.getElementById('ir').value='';document.getElementById('mf').reset();document.getElementById('md').classList.add('active')}
-function ed(id){fetch('/api/card/'+id).then(r=>r.json()).then(c=>{document.getElementById('mt').textContent='Редактировать';document.getElementById('ir').value=id;document.getElementById('in').value=c.name||'';document.getElementById('id').value=c.description||'';document.getElementById('ist').value=c.status||'New';document.getElementById('md').classList.add('active'})}
+function ed(id){fetch('/api/card/'+id).then(r=>r.json()).then(c=>{document.getElementById('mt').textContent='Редактировать';document.getElementById('ir').value=id;document.getElementById('in').value=c.title||'';document.getElementById('id').value=c.description||'';const revMap={'todo':'New','in_progress':'In Progress','done':'Done'};document.getElementById('ist').value=revMap[c.status]||'New';document.getElementById('md').classList.add('active'})}
 function dl(id){if(confirm('Удалить?')){fetch('/api/card/'+id,{method:'DELETE'}).then(()=>fetch('/api/cards').then(r=>r.json()).then(d=>{cards=d;render()}))}}
-document.getElementById('mf').onsubmit=function(e){e.preventDefault();const id=document.getElementById('ir').value;const data={name:document.getElementById('in').value,description:document.getElementById('id').value,status:document.getElementById('ist').value};fetch(id?'/api/card/'+id:'/api/card',{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}).then(()=>{cl();fetch('/api/cards').then(r=>r.json()).then(d=>{cards=d;render()})})}
+document.getElementById('mf').onsubmit=function(e){e.preventDefault();const id=document.getElementById('ir').value;const data={title:document.getElementById('in').value,description:document.getElementById('id').value,status:getStatus(document.getElementById('ist').value)};fetch(id?'/api/card/'+id:'/api/card',{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}).then(()=>{cl();fetch('/api/cards').then(r=>r.json()).then(d=>{cards=d;render()})})}
 function cl(){document.getElementById('md').classList.remove('active')}
 function tl(){document.getElementById('lc').classList.toggle('expanded')}
 setInterval(()=>fetch('/api/logs').then(r=>r.json()).then(l=>{document.getElementById('lc').innerHTML=l.slice(-5).reverse().map(e=>'<div class="log-e"><span class="t">'+e.time+'</span><span class="a">'+e.action+'</span> '+e.details+'</div>').join('')}),5000);
@@ -150,51 +170,79 @@ def index():
 
 @app.route('/api/cards', methods=['GET'])
 def api_get_cards():
-    return jsonify(load_cards())
+    tasks = Task.query.all()
+    return jsonify([{
+        'id': t.id,
+        'title': t.title,
+        'description': t.description,
+        'status': t.status,
+        'priority': t.priority,
+        'created_at': t.created_at.isoformat() if t.created_at else None
+    } for t in tasks])
 
 @app.route('/api/card/<int:card_id>', methods=['GET'])
 def api_get_card(card_id):
-    cards = load_cards()
-    card = next((c for c in cards if c['id'] == card_id), None)
-    if card:
-        return jsonify(card)
+    task = Task.query.get(card_id)
+    if task:
+        return jsonify({
+            'id': task.id,
+            'title': task.title,
+            'description': task.description,
+            'status': task.status,
+            'priority': task.priority
+        })
     return jsonify({"error": "Not found"}), 404
 
 @app.route('/api/card', methods=['POST'])
 def api_add_card():
     data = request.json
-    cards = load_cards()
-    new_id = max([c['id'] for c in cards], default=0) + 1
-    card = {"id": new_id, "name": data.get('name', ''), "description": data.get('description', ''), "status": data.get('status', 'New')}
-    cards.append(card)
-    save_cards(cards)
-    log("ADD", card['name'])
-    return jsonify({"success": True, "id": new_id})
+    # Для простоты используем author_id = 1
+    task = Task(
+        title=data.get('title', ''),
+        description=data.get('description', ''),
+        status=data.get('status', 'todo'),
+        author_id=1
+    )
+    db.session.add(task)
+    db.session.commit()
+    log("ADD", task.title)
+    return jsonify({"success": True, "id": task.id})
 
 @app.route('/api/card/<int:card_id>', methods=['PUT'])
 def api_update_card(card_id):
-    data = request.json
-    cards = load_cards()
-    for card in cards:
-        if card['id'] == card_id:
-            card.update(data)
-            save_cards(cards)
-            log("UPDATE", f"#{card_id} {card.get('name','')}")
-            return jsonify({"success": True})
+    task = Task.query.get(card_id)
+    if task:
+        data = request.json
+        if 'title' in data:
+            task.title = data['title']
+        if 'description' in data:
+            task.description = data['description']
+        if 'status' in data:
+            task.status = data['status']
+        if 'priority' in data:
+            task.priority = data['priority']
+        db.session.commit()
+        log("UPDATE", f"#{card_id} {task.title}")
+        return jsonify({"success": True})
     return jsonify({"error": "Not found"}), 404
 
 @app.route('/api/card/<int:card_id>', methods=['DELETE'])
 def api_delete_card(card_id):
-    cards = load_cards()
-    cards = [c for c in cards if c['id'] != card_id]
-    save_cards(cards)
-    log("DELETE", f"#{card_id}")
-    return jsonify({"success": True})
+    task = Task.query.get(card_id)
+    if task:
+        title = task.title
+        db.session.delete(task)
+        db.session.commit()
+        log("DELETE", f"#{card_id} {title}")
+        return jsonify({"success": True})
+    return jsonify({"error": "Not found"}), 404
 
 @app.route('/api/logs', methods=['GET'])
 def api_get_logs():
     return jsonify(LOG_STORAGE)
 
 if __name__ == '__main__':
-    log("START", "Канбан Доска запущена")
+    with app.app_context():
+        db.create_all()
+    log("START", "Канбан Доска запущена (PostgreSQL)")
     app.run(host='0.0.0.0', port=5000, debug=False)
