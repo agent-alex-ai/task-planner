@@ -140,7 +140,7 @@ return`<div class="column col-${col.toLowerCase().replace(' ','-')}" ondragover=
 <div class="column-header"><span class="column-title">${col}</span><span class="column-count">${colCards.length}</span></div>
 <div class="column-cards">
 ${colCards.map(c=>`<div class="card" draggable="true" ondragstart="drag(event,${c.id})">
-<div class="card-title">${c.title}</div>
+<div class="card-title">#${c.id} ${c.title}</div>
 <div class="card-desc">${c.description||''}</div>
 <div class="card-actions">
 <button class="card-btn" onclick="ed(${c.id})">✏️</button>
@@ -152,7 +152,7 @@ function drag(e,id){dragId=id}
 function drago(e){e.preventDefault();e.currentTarget.classList.add('dropping')}
 function drop(e,col){e.preventDefault();e.currentTarget.classList.remove('dropping');if(dragId){fetch('/api/card/'+dragId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:getStatus(col)})}).then(()=>fetch('/api/cards').then(r=>r.json()).then(d=>{cards=d;render()}))}}
 function openModal(){document.getElementById('mt').textContent='Новая';document.getElementById('ir').value='';document.getElementById('mf').reset();document.getElementById('md').classList.add('active')}
-function ed(id){fetch('/api/card/'+id).then(r=>r.json()).then(c=>{document.getElementById('mt').textContent='Редактировать';document.getElementById('ir').value=id;document.getElementById('in').value=c.title||'';document.getElementById('id').value=c.description||'';const revMap={'todo':'New','in_progress':'In Progress','done':'Done'};document.getElementById('ist').value=revMap[c.status]||'New';document.getElementById('md').classList.add('active'})}
+function ed(id){fetch('/api/card/'+id).then(r=>r.json()).then(c=>{document.getElementById('mt').textContent='Редактировать #' + id;document.getElementById('ir').value=id;document.getElementById('in').value=c.title||'';document.getElementById('id').value=c.description||'';const revMap={'todo':'New','in_progress':'In Progress','done':'Done'};document.getElementById('ist').value=revMap[c.status]||'New';document.getElementById('md').classList.add('active'})}
 function dl(id){if(confirm('Удалить?')){fetch('/api/card/'+id,{method:'DELETE'}).then(()=>fetch('/api/cards').then(r=>r.json()).then(d=>{cards=d;render()}))}}
 document.getElementById('mf').onsubmit=function(e){e.preventDefault();const id=document.getElementById('ir').value;const data={title:document.getElementById('in').value,description:document.getElementById('id').value,status:getStatus(document.getElementById('ist').value)};fetch(id?'/api/card/'+id:'/api/card',{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}).then(()=>{cl();fetch('/api/cards').then(r=>r.json()).then(d=>{cards=d;render()})})}
 function cl(){document.getElementById('md').classList.remove('active')}
